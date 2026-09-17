@@ -33,7 +33,7 @@
              nếu không quảng cáo sẽ luôn là quảng cáo test, không sinh ra doanh thu thật. -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-9115566510125630~7005340081" />
     </application>
 
     <!-- Permissions -->
