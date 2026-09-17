@@ -40,6 +40,8 @@ jobs:
 
       - name: Đồng bộ Capacitor sang Android
         run: npx cap sync android
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
 
       - name: Cấp quyền chạy gradlew
         working-directory: frontend/android
