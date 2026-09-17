@@ -26,6 +26,16 @@ const userSchema = new mongoose.Schema(
     password: { type: String, select: false },
     googleId: { type: String, unique: true, sparse: true, index: true },
     avatar: { type: String },
+
+    // Xác thực email: user đăng ký bằng email/mật khẩu phải bấm link trong email mới đăng nhập được.
+    // User đăng ký qua Google coi như đã xác thực sẵn (Google đã xác thực email đó).
+    emailVerified: { type: Boolean, default: false },
+    verificationToken: { type: String, select: false },
+    verificationTokenExpires: { type: Date, select: false },
+
+    // Thông tin bổ sung, chỉnh sửa trong phần Cài đặt tài khoản
+    phone: { type: String, trim: true },
+    address: { type: String, trim: true },
   },
   { timestamps: true }
 );
@@ -38,6 +48,9 @@ userSchema.methods.toPublicJSON = function toPublicJSON() {
     email: this.email,
     avatar: this.avatar || null,
     hasPassword: !!this.password,
+    emailVerified: this.emailVerified,
+    phone: this.phone || null,
+    address: this.address || null,
     createdAt: this.createdAt,
   };
 };

@@ -39,18 +39,22 @@ async function request(path, options = {}) {
     data = await res.json();
   } catch (e) {}
   if (!res.ok) {
-    throw new Error(data?.message || "Có lỗi xảy ra, vui lòng thử lại");
+    const err = new Error(data?.message || "Có lỗi xảy ra, vui lòng thử lại");
+    // Giữ lại các field phụ (vd emailNotVerified, email) để UI xử lý riêng
+    if (data && typeof data === "object") Object.assign(err, data);
+    throw err;
   }
   return data;
 }
 
+// Trả về { pendingVerification: true, email, message } — không tự đăng nhập,
+// vì tài khoản phải xác nhận email trước.
 export async function register({ name, email, password, username }) {
   const data = await request("/auth/register", {
     method: "POST",
     body: JSON.stringify({ name, email, password, username }),
   });
-  setToken(data.token);
-  return data.user;
+  return data;
 }
 
 export async function login({ email, password }) {
@@ -60,6 +64,13 @@ export async function login({ email, password }) {
   });
   setToken(data.token);
   return data.user;
+}
+
+export async function resendVerification(email) {
+  return request("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
 }
 
 export async function loginWithGoogle(idToken) {
@@ -80,6 +91,14 @@ export async function setUsername(username) {
   const data = await request("/auth/username", {
     method: "PATCH",
     body: JSON.stringify({ username }),
+  });
+  return data.user;
+}
+
+export async function updateProfile({ name, phone, address }) {
+  const data = await request("/auth/profile", {
+    method: "PATCH",
+    body: JSON.stringify({ name, phone, address }),
   });
   return data.user;
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Mail, Lock, User as UserIcon, AtSign, Loader2 } from "lucide-react";
-import { register, login, loginWithGoogle, setUsername as apiSetUsername } from "../lib/authApi";
+import { Mail, Lock, User as UserIcon, AtSign, Loader2, MailCheck } from "lucide-react";
+import { register, login, loginWithGoogle, setUsername as apiSetUsername, resendVerification } from "../lib/authApi";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
@@ -29,6 +29,24 @@ export default function AuthScreen({ C, onAuthed }) {
   const [googleReady, setGoogleReady] = useState(false);
   const [needsUsername, setNeedsUsername] = useState(null); // user object trả về từ Google nhưng chưa có username
   const [pickedUsername, setPickedUsername] = useState("");
+  const [pendingEmail, setPendingEmail] = useState(null); // set khi vừa đăng ký xong, chờ xác nhận email
+  const [unverifiedEmail, setUnverifiedEmail] = useState(null); // set khi login báo email chưa xác nhận
+  const [resendState, setResendState] = useState("idle"); // idle | sending | sent
+  const [verifyNotice, setVerifyNotice] = useState(null); // { type: 'success'|'error'|'expired', email? }
+
+  // Đọc kết quả từ link xác nhận email (backend redirect về đây kèm query param ?verify=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const verify = params.get("verify");
+    if (verify) {
+      setVerifyNotice({ type: verify, email: params.get("email"), reason: params.get("reason") });
+      if (verify === "expired" && params.get("email")) setUnverifiedEmail(params.get("email"));
+      // Xoá query param khỏi URL để bấm F5 không hiện lại thông báo
+      const url = new URL(window.location.href);
+      url.search = "";
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
 
   const handleGoogleCredential = async (response) => {
     setError("");
@@ -87,21 +105,40 @@ export default function AuthScreen({ C, onAuthed }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setUnverifiedEmail(null);
     if (!email || !password || (mode === "register" && (!name || !username))) {
       setError("Vui lòng nhập đầy đủ thông tin");
       return;
     }
     setLoading(true);
     try {
-      const user =
-        mode === "register"
-          ? await register({ name, email, password, username })
-          : await login({ email, password });
-      onAuthed(user);
+      if (mode === "register") {
+        const result = await register({ name, email, password, username });
+        setPendingEmail(result.email || email);
+      } else {
+        const user = await login({ email, password });
+        onAuthed(user);
+      }
     } catch (e) {
-      setError(e.message || "Có lỗi xảy ra, vui lòng thử lại");
+      if (e.emailNotVerified) {
+        setUnverifiedEmail(e.email || email);
+        setResendState("idle");
+      } else {
+        setError(e.message || "Có lỗi xảy ra, vui lòng thử lại");
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async (targetEmail) => {
+    setResendState("sending");
+    try {
+      await resendVerification(targetEmail);
+      setResendState("sent");
+    } catch (e) {
+      setError(e.message || "Có lỗi xảy ra, vui lòng thử lại");
+      setResendState("idle");
     }
   };
 
@@ -122,6 +159,51 @@ export default function AuthScreen({ C, onAuthed }) {
       setLoading(false);
     }
   };
+
+  if (pendingEmail) {
+    return (
+      <div className="w-full flex items-center justify-center px-6" style={{ height: "100dvh", backgroundColor: C.bg }}>
+        <div className="w-full text-center" style={{ maxWidth: 360 }}>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: C.navy }}>
+            <MailCheck size={26} color="#fff" />
+          </div>
+          <div className="text-xl font-bold mb-2" style={{ color: C.text }}>Kiểm tra email của bạn</div>
+          <div className="text-sm mb-1" style={{ color: C.sub }}>
+            Chúng tôi đã gửi link xác nhận tới
+          </div>
+          <div className="text-sm font-semibold mb-6" style={{ color: C.text }}>{pendingEmail}</div>
+          <div className="text-xs mb-6" style={{ color: C.sub }}>
+            Bấm vào link trong email để kích hoạt tài khoản, sau đó quay lại đây để đăng nhập.
+          </div>
+          {resendState === "sent" ? (
+            <div className="text-xs font-semibold mb-4" style={{ color: C.navy }}>Đã gửi lại email xác nhận!</div>
+          ) : (
+            <button
+              onClick={() => handleResend(pendingEmail)}
+              disabled={resendState === "sending"}
+              className="text-xs font-semibold mb-4 flex items-center justify-center gap-1.5 mx-auto"
+              style={{ color: C.navy, opacity: resendState === "sending" ? 0.6 : 1 }}
+            >
+              {resendState === "sending" && <Loader2 size={12} className="animate-spin" />}
+              Không nhận được email? Gửi lại
+            </button>
+          )}
+          {error && <div className="text-xs mb-4" style={{ color: C.red }}>{error}</div>}
+          <button
+            onClick={() => {
+              setPendingEmail(null);
+              setMode("login");
+              setError("");
+            }}
+            className="w-full rounded-full py-3 text-sm font-semibold text-white"
+            style={{ backgroundColor: C.navy }}
+          >
+            Quay lại đăng nhập
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (needsUsername) {
     return (
@@ -186,6 +268,21 @@ export default function AuthScreen({ C, onAuthed }) {
           </div>
         </div>
 
+        {verifyNotice && (
+          <div
+            className="text-xs mb-4 p-3 rounded-xl text-center font-semibold"
+            style={
+              verifyNotice.type === "success"
+                ? { backgroundColor: C.navyBg || "#e0e7ff", color: C.navy }
+                : { backgroundColor: C.redBg, color: C.red }
+            }
+          >
+            {verifyNotice.type === "success" && "Xác nhận email thành công! Bạn có thể đăng nhập ngay."}
+            {verifyNotice.type === "expired" && "Link xác nhận đã hết hạn. Bấm gửi lại email xác nhận bên dưới."}
+            {verifyNotice.type === "error" && "Link xác nhận không hợp lệ hoặc đã được dùng."}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
           {mode === "register" && (
             <>
@@ -236,6 +333,25 @@ export default function AuthScreen({ C, onAuthed }) {
             </div>
           )}
 
+          {unverifiedEmail && (
+            <div className="text-xs mt-2 mb-1" style={{ color: C.sub }}>
+              Email <span className="font-semibold" style={{ color: C.text }}>{unverifiedEmail}</span> chưa được xác nhận.{" "}
+              {resendState === "sent" ? (
+                <span className="font-semibold" style={{ color: C.navy }}>Đã gửi lại email xác nhận!</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleResend(unverifiedEmail)}
+                  disabled={resendState === "sending"}
+                  className="font-semibold underline"
+                  style={{ color: C.navy }}
+                >
+                  {resendState === "sending" ? "Đang gửi..." : "Gửi lại email xác nhận"}
+                </button>
+              )}
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
@@ -264,6 +380,7 @@ export default function AuthScreen({ C, onAuthed }) {
             type="button"
             onClick={() => {
               setError("");
+              setUnverifiedEmail(null);
               setMode(mode === "register" ? "login" : "register");
             }}
             className="font-semibold"

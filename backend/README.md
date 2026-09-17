@@ -7,11 +7,14 @@ Chỉ xử lý tài khoản người dùng — chưa đụng tới dữ liệu C
 
 | Method | Endpoint | Body | Mô tả |
 |---|---|---|---|
-| POST | `/auth/register` | `{ name, email, password, username }` | Đăng ký tài khoản mới (username dùng để người khác mời cộng tác) |
-| POST | `/auth/login` | `{ email, password }` | Đăng nhập bằng email/mật khẩu |
-| POST | `/auth/google` | `{ idToken }` | Đăng nhập/đăng ký bằng Google (nếu chưa có username, frontend sẽ hỏi thêm) |
+| POST | `/auth/register` | `{ name, email, password, username }` | Đăng ký tài khoản mới (username dùng để người khác mời cộng tác). **Không** đăng nhập ngay — gửi email xác nhận, phải bấm link mới đăng nhập được |
+| GET | `/auth/verify-email?token=...` | — | Link trong email xác nhận trỏ tới đây; xác nhận xong sẽ chuyển hướng (redirect) về `FRONTEND_URL` kèm `?verify=success\|expired\|error` |
+| POST | `/auth/resend-verification` | `{ email }` | Gửi lại email xác nhận (dùng khi email cũ hết hạn hoặc không nhận được) |
+| POST | `/auth/login` | `{ email, password }` | Đăng nhập bằng email/mật khẩu. Trả lỗi 403 kèm `emailNotVerified: true` nếu tài khoản chưa xác nhận email |
+| POST | `/auth/google` | `{ idToken }` | Đăng nhập/đăng ký bằng Google (nếu chưa có username, frontend sẽ hỏi thêm). Tài khoản Google coi như đã xác thực email sẵn |
 | GET | `/auth/me` | header `Authorization: Bearer <token>` | Lấy thông tin user hiện tại |
 | PATCH | `/auth/username` | `{ username }` | Đặt/đổi username (dùng cho user đăng ký qua Google) |
+| PATCH | `/auth/profile` | `{ name?, phone?, address? }` | Cập nhật họ tên / số điện thoại / địa chỉ |
 | GET | `/businesses` | — | Danh sách công việc tôi sở hữu hoặc đã tham gia |
 | POST | `/businesses` | `{ name, customers?, products?, quotes?, tasks? }` | Tạo công việc mới (có thể kèm dữ liệu di trú) |
 | PATCH | `/businesses/:id` | `{ name }` | Đổi tên (chỉ chủ sở hữu) |
@@ -38,6 +41,29 @@ cp .env.example .env
 npm install
 npm run dev
 ```
+
+## Xác nhận email khi đăng ký
+
+Khi đăng ký bằng email/mật khẩu, tài khoản ở trạng thái chưa kích hoạt cho tới khi bấm link xác nhận gửi qua email (link có hiệu lực 24 giờ). Đăng ký/đăng nhập qua Google thì bỏ qua bước này (Google đã xác thực email sẵn).
+
+Cần thêm các biến môi trường sau để gửi được email:
+
+| Biến | Mô tả |
+|---|---|
+| `SMTP_HOST` | Địa chỉ máy chủ SMTP (vd `smtp.gmail.com`, hoặc host của Brevo/SendGrid/Mailgun...) |
+| `SMTP_PORT` | Cổng SMTP — thường `587` (STARTTLS) hoặc `465` (SSL) |
+| `SMTP_USER` | Tài khoản đăng nhập SMTP |
+| `SMTP_PASS` | Mật khẩu / App Password của tài khoản SMTP |
+| `MAIL_FROM` | Địa chỉ hiển thị ở mục "From" (mặc định dùng `SMTP_USER` nếu để trống) |
+| `BACKEND_URL` | URL công khai của backend (vd `https://htp-crm-backend.onrender.com`), dùng để build link `.../auth/verify-email?token=...` trong email |
+| `FRONTEND_URL` | URL frontend (vd `https://htp-crm.vercel.app`), sau khi xác nhận xong backend sẽ chuyển hướng người dùng về đây |
+
+**Dùng Gmail để gửi email (cách nhanh nhất để test):**
+1. Bật xác minh 2 bước cho tài khoản Gmail
+2. Vào https://myaccount.google.com/apppasswords → tạo "App Password" mới
+3. Điền `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER=<email gmail>`, `SMTP_PASS=<app password 16 ký tự>`
+
+Gmail giới hạn khoảng 500 email/ngày cho tài khoản cá nhân — đủ dùng lúc mới ra mắt; nếu lượng đăng ký tăng cao, nên chuyển sang dịch vụ email chuyên dụng (Brevo, Resend, SendGrid... đều có gói miễn phí vài trăm email/ngày và cấu hình SMTP tương tự).
 
 ## 1. Tạo MongoDB Atlas (nếu chưa có)
 

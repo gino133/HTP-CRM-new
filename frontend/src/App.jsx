@@ -4,13 +4,13 @@ import {
   ChevronLeft, Search, Trash2, Pencil, ArrowLeft, TrendingUp, TrendingDown,
   Check, Phone, Mail, MapPin, Building2, Lock, Minus, ListChecks, CheckCircle2,
   Circle, Clock, Repeat, CalendarDays, Send, Copy, Settings, Sun, Moon, Smartphone, Bell,
-  Loader2, LogOut, UserPlus
+  Loader2, LogOut, UserPlus, AtSign, PencilLine
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from "recharts";
 import AuthScreen from "./components/AuthScreen";
-import { getToken, fetchMe, logout as apiLogout } from "./lib/authApi";
+import { getToken, fetchMe, logout as apiLogout, updateProfile, setUsername as apiSetUsername } from "./lib/authApi";
 import {
   listBusinesses, createBusiness, renameBusiness as renameBusinessApi, deleteBusinessApi,
   getBusinessData, putBusinessData, inviteToBusiness, removeMember,
@@ -1485,6 +1485,7 @@ export default function PersonalCRM() {
                   onOpenBusinessSwitch={() => { refreshInvites(); openScreen({ type: "businessSwitch" }); }}
                   user={user}
                   onLogout={handleLogout}
+                  onUpdateUser={setUser}
                 />
               )}
             </Screen>
@@ -2961,32 +2962,141 @@ function TaskForm({ existing, presetDate, presetCustomerId, customers, onSave, o
 }
 
 /* ---------------------------------- SETTINGS SCREEN ---------------------------------- */
-function SettingsScreen({ themeMode, accentTone, onSetThemeMode, onSetAccentTone, systemPrefersDark, businesses, currentBusinessId, pendingInvitesCount, onOpenBusinessSwitch, user, onLogout }) {
+function SettingsScreen({ themeMode, accentTone, onSetThemeMode, onSetAccentTone, systemPrefersDark, businesses, currentBusinessId, pendingInvitesCount, onOpenBusinessSwitch, user, onLogout, onUpdateUser }) {
   const modes = [
     { k: "light", l: "Sáng", icon: Sun },
     { k: "dark", l: "Tối", icon: Moon },
     { k: "system", l: "Theo hệ thống", icon: Smartphone },
   ];
   const currentBiz = businesses?.find((b) => b.id === currentBusinessId);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    username: user?.username || "",
+    phone: user?.phone || "",
+    address: user?.address || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  const startEdit = () => {
+    setForm({ username: user?.username || "", phone: user?.phone || "", address: user?.address || "" });
+    setSaveError("");
+    setEditing(true);
+  };
+
+  const saveProfile = async () => {
+    setSaveError("");
+    if (form.username && !/^[a-zA-Z0-9_]{3,20}$/.test(form.username)) {
+      setSaveError("Username chỉ gồm chữ, số, dấu gạch dưới, từ 3-20 ký tự");
+      return;
+    }
+    setSaving(true);
+    try {
+      let nextUser = user;
+      if (form.username && form.username !== user?.username) {
+        nextUser = await apiSetUsername(form.username);
+      }
+      nextUser = await updateProfile({ phone: form.phone, address: form.address });
+      onUpdateUser?.(nextUser);
+      setEditing(false);
+    } catch (e) {
+      setSaveError(e.message || "Có lỗi xảy ra, vui lòng thử lại");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="px-5 py-5">
       <div className="text-sm font-bold mb-2.5" style={{ color: C.text }}>Tài khoản</div>
       <div
-        className="w-full flex items-center justify-between rounded-2xl p-3.5 mb-6"
+        className="w-full rounded-2xl p-3.5 mb-6"
         style={{ backgroundColor: C.card, border: `1px solid ${C.border}` }}
       >
-        <div className="min-w-0">
-          <div className="text-sm font-bold truncate" style={{ color: C.text }}>{user?.name}</div>
-          <div className="text-xs truncate" style={{ color: C.sub }}>{user?.email}</div>
+        <div className="flex items-center justify-between mb-1">
+          <div className="min-w-0">
+            <div className="text-sm font-bold truncate" style={{ color: C.text }}>{user?.name}</div>
+            <div className="text-xs truncate" style={{ color: C.sub }}>{user?.email}</div>
+          </div>
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold flex-shrink-0"
+            style={{ backgroundColor: C.redBg, color: C.red }}
+          >
+            <LogOut size={14} />
+            Đăng xuất
+          </button>
         </div>
-        <button
-          onClick={onLogout}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold flex-shrink-0"
-          style={{ backgroundColor: C.redBg, color: C.red }}
-        >
-          <LogOut size={14} />
-          Đăng xuất
-        </button>
+
+        {!editing ? (
+          <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-xs flex items-center gap-1.5" style={{ color: C.sub }}><AtSign size={12} /> Username</span>
+              <span className="text-xs font-semibold" style={{ color: C.text }}>{user?.username || "Chưa đặt"}</span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-xs flex items-center gap-1.5" style={{ color: C.sub }}><Phone size={12} /> Số điện thoại</span>
+              <span className="text-xs font-semibold" style={{ color: C.text }}>{user?.phone || "Chưa có"}</span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-xs flex items-center gap-1.5" style={{ color: C.sub }}><MapPin size={12} /> Địa chỉ</span>
+              <span className="text-xs font-semibold text-right truncate ml-3" style={{ color: C.text, maxWidth: "60%" }}>{user?.address || "Chưa có"}</span>
+            </div>
+            <button
+              onClick={startEdit}
+              className="w-full mt-2.5 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+              style={{ backgroundColor: C.navyBg, color: C.navy }}
+            >
+              <PencilLine size={13} />
+              Chỉnh sửa thông tin
+            </button>
+          </div>
+        ) : (
+          <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
+            <Field label="Username">
+              <TextInput
+                value={form.username}
+                onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+                placeholder="username"
+              />
+            </Field>
+            <Field label="Số điện thoại">
+              <TextInput
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="09xxxxxxxx"
+              />
+            </Field>
+            <Field label="Địa chỉ">
+              <TextArea
+                rows={2}
+                value={form.address}
+                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                placeholder="Số nhà, đường, phường/xã, tỉnh/thành..."
+              />
+            </Field>
+            {saveError && <div className="text-xs mb-3" style={{ color: C.red }}>{saveError}</div>}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold"
+                style={{ backgroundColor: C.inputBg, color: C.sub }}
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={saveProfile}
+                disabled={saving}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-1.5"
+                style={{ backgroundColor: C.navy, opacity: saving ? 0.7 : 1 }}
+              >
+                {saving && <Loader2 size={12} className="animate-spin" />}
+                Lưu
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="text-sm font-bold mb-2.5" style={{ color: C.text }}>Doanh nghiệp / Công việc</div>
