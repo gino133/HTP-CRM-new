@@ -99,7 +99,7 @@ const getAdMob = () => (typeof window !== "undefined" ? window.Capacitor?.Plugin
    TRƯỚC KHI PHÁT HÀNH THẬT: thay 2 ID bên dưới bằng Ad Unit ID thật lấy từ tài khoản AdMob của bạn,
    đồng thời đổi App ID thật trong AndroidManifest.xml (Android) và Info.plist (iOS). */
 const ADMOB_BANNER_TEST_ID = {
-  android: "ca-app-pub-3940256099942544/6300978111",
+  android: "ca-app-pub-9115566510125630/6823533373",
   ios: "ca-app-pub-3940256099942544/2934735716",
 };
 async function initAndShowBannerAd() {
