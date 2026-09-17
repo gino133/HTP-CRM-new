@@ -8,6 +8,7 @@ import "./index.css";
 import "@capacitor/local-notifications";
 import "@capacitor/app";
 import "@capacitor-community/admob";
+import "@codetrix-studio/capacitor-google-auth";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

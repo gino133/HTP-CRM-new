@@ -16,7 +16,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Dùng 1 debug.keystore CỐ ĐỊNH (commit sẵn trong repo, xem debug.keystore cạnh file này) thay vì
+    // để Gradle tự tạo keystore ngẫu nhiên mỗi máy/mỗi lần chạy CI. Lý do: SHA-1 fingerprint của keystore
+    // ký app phải khai báo với Google Cloud Console để đăng nhập Google (native) hoạt động — nếu SHA-1
+    // đổi liên tục (vd build trên GitHub Actions, máy mới mỗi lần) thì đăng nhập Google sẽ luôn báo lỗi
+    // DEVELOPER_ERROR / 10 dù cấu hình code đúng.
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
