@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">HTP CRM</string>
+    <string name="title_activity_main">HTP CRM</string>
+    <string name="package_name">com.htp.crm</string>
+    <string name="custom_url_scheme">com.htp.crm</string>
+</resources>
