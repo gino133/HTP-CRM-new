@@ -8,7 +8,27 @@ import inviteRoutes from "./routes/invites.js";
 
 const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
+// Cho phép cấu hình nhiều origin cùng lúc, cách nhau bởi dấu phẩy trong CORS_ORIGIN,
+// vd: "https://htp-crm.vercel.app,https://localhost" (https://localhost là origin mặc định
+// của WebView Capacitor trên app Android/iOS, khác hẳn domain web nên phải khai báo riêng).
+const allowedOrigins = (process.env.CORS_ORIGIN || "*")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Không có Origin header (vd gọi trực tiếp bằng curl/Postman) -> luôn cho qua
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      console.warn(`[cors] Chặn origin không được phép: ${origin}`);
+      return callback(new Error("Không được phép bởi CORS"));
+    },
+  })
+);
 app.use(express.json({ limit: "5mb" })); // dữ liệu CRM (khách hàng/báo giá...) có thể khá lớn khi đồng bộ cả lát dữ liệu
 
 app.get("/", (req, res) => res.json({ ok: true, service: "htp-crm-backend" }));

@@ -98,6 +98,8 @@ Gmail giới hạn khoảng 500 email/ngày cho tài khoản cá nhân — đủ
 3. Build Command: `npm install`
 4. Start Command: `npm start`
 5. Thêm Environment Variables giống hệt file `.env` (MONGODB_URI, JWT_SECRET, JWT_EXPIRES_IN, GOOGLE_CLIENT_ID, CORS_ORIGIN)
+
+> **`CORS_ORIGIN` khi có cả bản web lẫn app native:** có thể điền nhiều origin, cách nhau bởi dấu phẩy, không có khoảng trắng dư hay dấu `/` cuối. Ví dụ: `CORS_ORIGIN=https://htp-crm.vercel.app,https://localhost` — trong đó `https://localhost` là origin mặc định mà app Android/iOS đóng gói bằng Capacitor luôn dùng khi gọi API, khác hẳn domain web nên phải khai báo riêng, không tự động được cho phép.
 6. Deploy xong, copy URL Render cấp (vd `https://htp-crm-backend.onrender.com`) → điền vào `VITE_API_URL` ở frontend
 
 ## Việc sẽ làm sau (chưa nằm trong scope lần này)
