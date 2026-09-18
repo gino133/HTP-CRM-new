@@ -47,6 +47,12 @@ jobs:
         working-directory: frontend/android
         run: chmod +x ./gradlew
 
+        - name: In SHA-1 của keystore đang dùng để build (để đối chiếu với Google Cloud Console)
+        working-directory: frontend/android/app
+        run: |
+          echo "===== SHA-1 thực tế của debug.keystore đang dùng để ký app ====="
+          keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android | grep -E "SHA1|SHA256"
+          echo "================================================================"
       - name: Build APK (debug)
         working-directory: frontend/android
         run: ./gradlew assembleDebug --no-daemon
