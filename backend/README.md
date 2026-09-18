@@ -46,24 +46,23 @@ npm run dev
 
 Khi đăng ký bằng email/mật khẩu, tài khoản ở trạng thái chưa kích hoạt cho tới khi bấm link xác nhận gửi qua email (link có hiệu lực 24 giờ). Đăng ký/đăng nhập qua Google thì bỏ qua bước này (Google đã xác thực email sẵn).
 
-Cần thêm các biến môi trường sau để gửi được email:
+Gửi email qua HTTP API của **Resend** (https://resend.com) thay vì SMTP thô — vì nhiều nền tảng hosting miễn phí (kể cả Render) chặn/giới hạn kết nối ra ngoài qua các cổng SMTP (25, 465, 587), gây lỗi `ETIMEDOUT` dù tài khoản SMTP đúng. HTTP API dùng cổng 443 (cổng web bình thường) nên không bị chặn.
+
+Cần thêm các biến môi trường sau:
 
 | Biến | Mô tả |
 |---|---|
-| `SMTP_HOST` | Địa chỉ máy chủ SMTP (vd `smtp.gmail.com`, hoặc host của Brevo/SendGrid/Mailgun...) |
-| `SMTP_PORT` | Cổng SMTP — thường `587` (STARTTLS) hoặc `465` (SSL) |
-| `SMTP_USER` | Tài khoản đăng nhập SMTP |
-| `SMTP_PASS` | Mật khẩu / App Password của tài khoản SMTP |
-| `MAIL_FROM` | Địa chỉ hiển thị ở mục "From" (mặc định dùng `SMTP_USER` nếu để trống) |
+| `RESEND_API_KEY` | API key lấy từ https://resend.com (đăng ký miễn phí, 3.000 email/tháng) |
+| `MAIL_FROM` | Địa chỉ hiển thị ở mục "From". Có thể để trống lúc mới test — mặc định dùng `HTP CRM <onboarding@resend.dev>` (địa chỉ test có sẵn của Resend, gửi được ngay không cần xác minh domain) |
 | `BACKEND_URL` | URL công khai của backend (vd `https://htp-crm-backend.onrender.com`), dùng để build link `.../auth/verify-email?token=...` trong email |
 | `FRONTEND_URL` | URL frontend (vd `https://htp-crm.vercel.app`), sau khi xác nhận xong backend sẽ chuyển hướng người dùng về đây |
 
-**Dùng Gmail để gửi email (cách nhanh nhất để test):**
-1. Bật xác minh 2 bước cho tài khoản Gmail
-2. Vào https://myaccount.google.com/apppasswords → tạo "App Password" mới
-3. Điền `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER=<email gmail>`, `SMTP_PASS=<app password 16 ký tự>`
+**Cách lấy `RESEND_API_KEY`:**
+1. Vào https://resend.com → Sign up (miễn phí, có thể đăng ký bằng Google)
+2. Vào mục **API Keys** → **Create API Key** → đặt tên tuỳ ý → copy giá trị (chỉ hiện 1 lần)
+3. Điền vào biến `RESEND_API_KEY` trên Render
 
-Gmail giới hạn khoảng 500 email/ngày cho tài khoản cá nhân — đủ dùng lúc mới ra mắt; nếu lượng đăng ký tăng cao, nên chuyển sang dịch vụ email chuyên dụng (Brevo, Resend, SendGrid... đều có gói miễn phí vài trăm email/ngày và cấu hình SMTP tương tự).
+Ban đầu chưa cần làm gì thêm — cứ để `MAIL_FROM` trống, email gửi từ `onboarding@resend.dev` vẫn tới được bất kỳ địa chỉ nào (không giới hạn như sandbox mode của 1 số dịch vụ khác). Khi nào có domain riêng cho công ty, vào Resend → **Domains** → thêm và xác minh domain đó (thêm vài bản ghi DNS), sau đó đổi `MAIL_FROM` thành vd `HTP CRM <noreply@tenmiencuaban.com>` để email trông chuyên nghiệp hơn.
 
 ## 1. Tạo MongoDB Atlas (nếu chưa có)
 
