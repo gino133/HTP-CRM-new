@@ -30,7 +30,7 @@ jobs:
           java-version: "21"
 
       - name: Cài dependencies frontend
-        run: npm ci --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       - name: Build web assets (Vite)
         run: npm run build
