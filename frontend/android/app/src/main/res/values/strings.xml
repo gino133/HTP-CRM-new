@@ -4,4 +4,5 @@
     <string name="title_activity_main">HTP CRM</string>
     <string name="package_name">com.htp.crm</string>
     <string name="custom_url_scheme">com.htp.crm</string>
+    <string name="server_client_id">GOOGLE_WEB_CLIENT_ID_PLACEHOLDER</string>
 </resources>
