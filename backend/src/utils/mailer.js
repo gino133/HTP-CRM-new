@@ -1,17 +1,20 @@
-// Gửi email qua HTTP API của Resend (https://resend.com) thay vì kết nối SMTP thô.
-// Lý do: nhiều nền tảng hosting miễn phí (bao gồm Render) chặn/giới hạn kết nối ra ngoài
-// qua các cổng SMTP (25, 465, 587) để chống spam, gây lỗi ETIMEDOUT dù tài khoản SMTP đúng.
-// HTTP API dùng cổng 443 (cổng web bình thường) nên không bị chặn.
+// Gửi email qua HTTP API của Brevo (https://brevo.com, trước đây là Sendinblue).
+// Lý do dùng Brevo thay vì SMTP thô: nhiều nền tảng hosting miễn phí (kể cả Render) chặn/giới
+// hạn kết nối SMTP ra ngoài, gây lỗi ETIMEDOUT. HTTP API dùng cổng 443 nên không bị chặn.
+// Lý do dùng Brevo thay vì Resend: Brevo cho phép xác minh 1 ĐỊA CHỈ EMAIL đơn lẻ (không cần
+// sở hữu cả domain + cấu hình DNS) để gửi được tới bất kỳ người nhận nào - phù hợp khi
+// chưa có domain riêng.
 
 export async function sendVerificationEmail({ to, name, verifyUrl }) {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
-    throw new Error("Thiếu RESEND_API_KEY trong biến môi trường");
+    throw new Error("Thiếu BREVO_API_KEY trong biến môi trường");
   }
-  // "HTP CRM <onboarding@resend.dev>" là địa chỉ gửi test có sẵn của Resend, dùng được ngay
-  // không cần xác minh domain riêng. Khi có domain thật, đổi MAIL_FROM thành vd:
-  // "HTP CRM <noreply@tenmiencuaban.com>" (phải verify domain đó trong Resend trước).
-  const from = process.env.MAIL_FROM || "HTP CRM <onboarding@resend.dev>";
+  const senderEmail = process.env.MAIL_FROM_EMAIL;
+  const senderName = process.env.MAIL_FROM_NAME || "HTP CRM";
+  if (!senderEmail) {
+    throw new Error("Thiếu MAIL_FROM_EMAIL (phải là email đã xác minh 'Sender' trong Brevo)");
+  }
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
@@ -30,17 +33,18 @@ export async function sendVerificationEmail({ to, name, verifyUrl }) {
     </div>
   `;
 
-  const res = await fetch("https://api.resend.com/emails", {
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      "api-key": apiKey,
       "Content-Type": "application/json",
+      Accept: "application/json",
     },
     body: JSON.stringify({
-      from,
-      to,
+      sender: { email: senderEmail, name: senderName },
+      to: [{ email: to, name: name || undefined }],
       subject: "Xác nhận email - HTP CRM",
-      html,
+      htmlContent: html,
     }),
   });
 

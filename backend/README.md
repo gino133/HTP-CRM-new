@@ -46,23 +46,25 @@ npm run dev
 
 Khi đăng ký bằng email/mật khẩu, tài khoản ở trạng thái chưa kích hoạt cho tới khi bấm link xác nhận gửi qua email (link có hiệu lực 24 giờ). Đăng ký/đăng nhập qua Google thì bỏ qua bước này (Google đã xác thực email sẵn).
 
-Gửi email qua HTTP API của **Resend** (https://resend.com) thay vì SMTP thô — vì nhiều nền tảng hosting miễn phí (kể cả Render) chặn/giới hạn kết nối ra ngoài qua các cổng SMTP (25, 465, 587), gây lỗi `ETIMEDOUT` dù tài khoản SMTP đúng. HTTP API dùng cổng 443 (cổng web bình thường) nên không bị chặn.
+Gửi email qua HTTP API của **Brevo** (https://brevo.com, trước đây là Sendinblue) thay vì SMTP thô — vì nhiều nền tảng hosting miễn phí (kể cả Render) chặn/giới hạn kết nối ra ngoài qua các cổng SMTP (25, 465, 587), gây lỗi `ETIMEDOUT` dù tài khoản SMTP đúng. HTTP API dùng cổng 443 (cổng web bình thường) nên không bị chặn. Dùng Brevo (thay vì Resend) vì Brevo cho phép xác minh **1 địa chỉ email đơn lẻ** để gửi được cho bất kỳ ai — không cần sở hữu cả 1 domain riêng + cấu hình DNS.
 
 Cần thêm các biến môi trường sau:
 
 | Biến | Mô tả |
 |---|---|
-| `RESEND_API_KEY` | API key lấy từ https://resend.com (đăng ký miễn phí, 3.000 email/tháng) |
-| `MAIL_FROM` | Địa chỉ hiển thị ở mục "From". Có thể để trống lúc mới test — mặc định dùng `HTP CRM <onboarding@resend.dev>` (địa chỉ test có sẵn của Resend, gửi được ngay không cần xác minh domain) |
+| `BREVO_API_KEY` | API key lấy từ https://app.brevo.com (đăng ký miễn phí, 300 email/ngày) |
+| `MAIL_FROM_EMAIL` | Email dùng để gửi — **phải** là email đã xác minh "Sender" trong Brevo (xem hướng dẫn bên dưới) |
+| `MAIL_FROM_NAME` | Tên hiển thị ở mục "From" (tuỳ chọn, mặc định "HTP CRM") |
 | `BACKEND_URL` | URL công khai của backend (vd `https://htp-crm-backend.onrender.com`), dùng để build link `.../auth/verify-email?token=...` trong email |
 | `FRONTEND_URL` | URL frontend (vd `https://htp-crm.vercel.app`), sau khi xác nhận xong backend sẽ chuyển hướng người dùng về đây |
 
-**Cách lấy `RESEND_API_KEY`:**
-1. Vào https://resend.com → Sign up (miễn phí, có thể đăng ký bằng Google)
-2. Vào mục **API Keys** → **Create API Key** → đặt tên tuỳ ý → copy giá trị (chỉ hiện 1 lần)
-3. Điền vào biến `RESEND_API_KEY` trên Render
+**Cách lấy `BREVO_API_KEY` và xác minh sender:**
+1. Vào https://app.brevo.com → Sign up (miễn phí)
+2. Vào **Settings → SMTP & API → API Keys** → **Generate a new API key** → copy giá trị (chỉ hiện 1 lần), điền vào `BREVO_API_KEY`
+3. Vào **Settings → Senders, Domains & Dedicated IPs → Senders** → **Add a Sender** → nhập email bạn có quyền truy cập (vd chính email Gmail cá nhân của bạn) → Brevo gửi email xác nhận tới hộp thư đó → bấm link xác nhận trong email
+4. Điền đúng email vừa xác minh vào biến `MAIL_FROM_EMAIL`
 
-Ban đầu chưa cần làm gì thêm — cứ để `MAIL_FROM` trống, email gửi từ `onboarding@resend.dev` vẫn tới được bất kỳ địa chỉ nào (không giới hạn như sandbox mode của 1 số dịch vụ khác). Khi nào có domain riêng cho công ty, vào Resend → **Domains** → thêm và xác minh domain đó (thêm vài bản ghi DNS), sau đó đổi `MAIL_FROM` thành vd `HTP CRM <noreply@tenmiencuaban.com>` để email trông chuyên nghiệp hơn.
+Sau khi làm đủ 3 biến trên, gửi được email xác nhận cho **bất kỳ địa chỉ nào**, không giới hạn như chế độ test của 1 số dịch vụ khác. Khi nào có domain riêng cho công ty, có thể nâng cấp thêm bằng cách xác minh domain đó trong Brevo để gửi từ địa chỉ dạng `noreply@tenmiencuaban.com` cho chuyên nghiệp hơn.
 
 ## 1. Tạo MongoDB Atlas (nếu chưa có)
 
