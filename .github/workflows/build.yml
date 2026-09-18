@@ -43,6 +43,13 @@ jobs:
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
 
+      - name: Điền Web Client ID vào strings.xml (bắt buộc cho Google Sign-In native)
+        working-directory: frontend/android
+        run: |
+          sed -i "s|GOOGLE_WEB_CLIENT_ID_PLACEHOLDER|${{ secrets.VITE_GOOGLE_CLIENT_ID }}|g" app/src/main/res/values/strings.xml
+          echo "Đã điền server_client_id trong strings.xml:"
+          grep server_client_id app/src/main/res/values/strings.xml
+
       - name: Cấp quyền chạy gradlew
         working-directory: frontend/android
         run: chmod +x ./gradlew
@@ -50,7 +57,7 @@ jobs:
       - name: In SHA-1 của keystore đang dùng để build (để đối chiếu với Google Cloud Console)
         working-directory: frontend/android/app
         run: |
-          echo "===== SHA-1 thuc te cua debug.keystore dang dung de ky app ====="
+          echo "===== SHA-1 thực tế của debug.keystore đang dùng để ký app ====="
           keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android | grep -E "SHA1|SHA256"
           echo "================================================================"
 
