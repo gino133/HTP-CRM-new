@@ -15,7 +15,6 @@ const config: CapacitorConfig = {
     GoogleAuth: {
       scopes: ['profile', 'email'],
       serverClientId: process.env.VITE_GOOGLE_CLIENT_ID || '',
-      forceCodeForRefreshToken: true,
     },
   },
 };
