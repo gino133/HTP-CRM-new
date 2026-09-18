@@ -85,7 +85,7 @@ export default function AuthScreen({ C, onAuthed }) {
       // initialize() an toàn để gọi nhiều lần - phòng trường hợp cấu hình plugin
       // trong capacitor.config.ts chưa được native layer đọc kịp lúc app vừa mở
       try {
-        await GoogleAuth.initialize({ scopes: ["profile", "email"], serverClientId: GOOGLE_CLIENT_ID, forceCodeForRefreshToken: true });
+        await GoogleAuth.initialize({ scopes: ["profile", "email"], serverClientId: GOOGLE_CLIENT_ID });
       } catch (e) {}
       const result = await GoogleAuth.signIn();
       const idToken = result?.authentication?.idToken || result?.idToken;
@@ -97,6 +97,16 @@ export default function AuthScreen({ C, onAuthed }) {
       // Người dùng tự đóng hộp thoại chọn tài khoản -> không coi là lỗi
       const msg = e?.message || e?.error || "";
       if (!/cancel/i.test(String(msg))) {
+        // Hiện TOÀN BỘ chi tiết lỗi ra màn hình (tạm thời, để debug) - Google Sign-In
+        // native thường chỉ trả về thông báo chung chung như "Something went wrong",
+        // nên in luôn mọi field có trong object lỗi để tìm đúng nguyên nhân (mã lỗi, code...).
+        let debugDetails = "";
+        try {
+          debugDetails = JSON.stringify(e, Object.getOwnPropertyNames(e), 2);
+        } catch (jsonErr) {
+          debugDetails = String(e);
+        }
+        window.alert(`Lỗi đăng nhập Google (chi tiết để debug):\n\n${debugDetails}`);
         setError(typeof msg === "string" && msg ? msg : "Đăng nhập Google thất bại");
       }
     } finally {
