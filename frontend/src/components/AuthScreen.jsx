@@ -106,7 +106,7 @@ export default function AuthScreen({ C, onAuthed }) {
         } catch (jsonErr) {
           debugDetails = String(e);
         }
-        window.alert(`Lỗi đăng nhập Google (chi tiết để debug):\n\n${debugDetails}`);
+        window.alert(`Lỗi đăng nhập Google (chi tiết để debug):\n\nGOOGLE_CLIENT_ID app đang dùng:\n"${GOOGLE_CLIENT_ID}"\n(độ dài: ${GOOGLE_CLIENT_ID.length} ký tự)\n\nChi tiết lỗi:\n${debugDetails}`);
         setError(typeof msg === "string" && msg ? msg : "Đăng nhập Google thất bại");
       }
     } finally {
