@@ -99,7 +99,7 @@ const getAdMob = () => (typeof window !== "undefined" ? window.Capacitor?.Plugin
    TRƯỚC KHI PHÁT HÀNH THẬT: thay 2 ID bên dưới bằng Ad Unit ID thật lấy từ tài khoản AdMob của bạn,
    đồng thời đổi App ID thật trong AndroidManifest.xml (Android) và Info.plist (iOS). */
 const ADMOB_BANNER_TEST_ID = {
-  android: "ca-app-pub-9115566510125630/6823533373",
+  android: "ca-app-pub-3940256099942544/6300978111",
   ios: "ca-app-pub-3940256099942544/2934735716",
 };
 async function initAndShowBannerAd() {
@@ -546,6 +546,12 @@ export default function PersonalCRM() {
 
   const handleLogout = () => {
     apiLogout();
+    // Yêu cầu SDK Google Sign-In "quên" tài khoản đã đăng nhập gần nhất - nếu không làm bước
+    // này, lần đăng nhập Google tiếp theo sẽ tự động chọn lại đúng tài khoản cũ thay vì hiện
+    // hộp thoại chọn tài khoản, khiến không đổi được sang tài khoản Google khác.
+    try {
+      window.Capacitor?.Plugins?.GoogleAuth?.signOut?.();
+    } catch (e) {}
     setUser(null);
     setLoaded(false);
     setBusinesses([]);
