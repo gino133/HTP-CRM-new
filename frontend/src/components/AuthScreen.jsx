@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Mail, Lock, User as UserIcon, AtSign, Loader2, MailCheck } from "lucide-react";
-import { register, login, loginWithGoogle, setUsername as apiSetUsername, resendVerification } from "../lib/authApi";
+import { register, login, loginWithGoogle, setUsername as apiSetUsername, resendVerification, forgotPassword, resetPassword } from "../lib/authApi";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
@@ -23,8 +23,17 @@ function inputStyle(C) {
   };
 }
 
+// Khớp đúng quy tắc phía backend: tối thiểu 8 ký tự, có chữ hoa, chữ thường, số, ký tự đặc biệt
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+function passwordHint(password) {
+  if (!password) return null;
+  if (password.length < 8) return "Mật khẩu cần tối thiểu 8 ký tự";
+  if (!PASSWORD_REGEX.test(password)) return "Cần có chữ hoa, chữ thường, số và ký tự đặc biệt";
+  return null;
+}
+
 export default function AuthScreen({ C, onAuthed }) {
-  const [mode, setMode] = useState("login"); // 'login' | 'register'
+  const [mode, setMode] = useState("login"); // 'login' | 'register' | 'forgot'
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -39,6 +48,22 @@ export default function AuthScreen({ C, onAuthed }) {
   const [unverifiedEmail, setUnverifiedEmail] = useState(null); // set khi login báo email chưa xác nhận
   const [resendState, setResendState] = useState("idle"); // idle | sending | sent
   const [verifyNotice, setVerifyNotice] = useState(null); // { type: 'success'|'error'|'expired', email? }
+  const [resetToken, setResetToken] = useState(null); // token lấy từ link email đặt lại mật khẩu
+  const [newPassword, setNewPassword] = useState("");
+  const [resetDone, setResetDone] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+
+  // Đọc token đặt lại mật khẩu từ URL (link trong email trỏ thẳng về đây kèm ?resetToken=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("resetToken");
+    if (t) {
+      setResetToken(t);
+      const url = new URL(window.location.href);
+      url.search = "";
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
 
   // Đọc kết quả từ link xác nhận email (backend redirect về đây kèm query param ?verify=...)
   useEffect(() => {
@@ -161,6 +186,13 @@ export default function AuthScreen({ C, onAuthed }) {
       setError("Vui lòng nhập đầy đủ thông tin");
       return;
     }
+    if (mode === "register") {
+      const pwHint = passwordHint(password);
+      if (pwHint) {
+        setError(pwHint);
+        return;
+      }
+    }
     setLoading(true);
     try {
       if (mode === "register") {
@@ -193,6 +225,43 @@ export default function AuthScreen({ C, onAuthed }) {
     }
   };
 
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!email) {
+      setError("Vui lòng nhập email");
+      return;
+    }
+    setLoading(true);
+    try {
+      await forgotPassword(email);
+      setForgotSent(true);
+    } catch (e) {
+      setError(e.message || "Có lỗi xảy ra, vui lòng thử lại");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    const pwHint = passwordHint(newPassword);
+    if (pwHint) {
+      setError(pwHint);
+      return;
+    }
+    setLoading(true);
+    try {
+      await resetPassword({ token: resetToken, password: newPassword });
+      setResetDone(true);
+    } catch (e) {
+      setError(e.message || "Có lỗi xảy ra, vui lòng thử lại");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const submitUsername = async (e) => {
     e.preventDefault();
     setError("");
@@ -210,6 +279,66 @@ export default function AuthScreen({ C, onAuthed }) {
       setLoading(false);
     }
   };
+
+  if (resetToken) {
+    if (resetDone) {
+      return (
+        <div className="w-full flex items-center justify-center px-6" style={{ height: "100dvh", backgroundColor: C.bg }}>
+          <div className="w-full text-center" style={{ maxWidth: 360 }}>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: C.navy }}>
+              <Lock size={24} color="#fff" />
+            </div>
+            <div className="text-xl font-bold mb-2" style={{ color: C.text }}>Đặt lại mật khẩu thành công</div>
+            <div className="text-sm mb-6" style={{ color: C.sub }}>Bạn có thể đăng nhập bằng mật khẩu mới ngay bây giờ.</div>
+            <button
+              onClick={() => {
+                setResetToken(null);
+                setResetDone(false);
+                setNewPassword("");
+                setMode("login");
+              }}
+              className="w-full rounded-full py-3 text-sm font-semibold text-white"
+              style={{ backgroundColor: C.navy }}
+            >
+              Đăng nhập ngay
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="w-full flex items-center justify-center px-6" style={{ height: "100dvh", backgroundColor: C.bg }}>
+        <form onSubmit={handleResetSubmit} className="w-full" style={{ maxWidth: 360 }}>
+          <div className="text-xl font-bold mb-1 text-center" style={{ color: C.text }}>Đặt mật khẩu mới</div>
+          <div className="text-sm mb-6 text-center" style={{ color: C.sub }}>Nhập mật khẩu mới cho tài khoản của bạn</div>
+          <div className="relative mb-1">
+            <Lock size={16} style={{ position: "absolute", left: 12, top: 13, color: C.sub }} />
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Mật khẩu mới"
+              style={inputStyle(C)}
+              autoFocus
+            />
+          </div>
+          <div className="text-xs mb-4" style={{ color: C.sub }}>
+            Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt
+          </div>
+          {error && <div className="text-xs mb-3" style={{ color: C.red }}>{error}</div>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-full py-3 flex items-center justify-center gap-2 text-sm font-semibold text-white"
+            style={{ backgroundColor: C.navy, opacity: loading ? 0.7 : 1 }}
+          >
+            {loading && <Loader2 size={16} className="animate-spin" />}
+            Đặt lại mật khẩu
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   if (pendingEmail) {
     return (
@@ -252,6 +381,74 @@ export default function AuthScreen({ C, onAuthed }) {
             Quay lại đăng nhập
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (mode === "forgot") {
+    if (forgotSent) {
+      return (
+        <div className="w-full flex items-center justify-center px-6" style={{ height: "100dvh", backgroundColor: C.bg }}>
+          <div className="w-full text-center" style={{ maxWidth: 360 }}>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: C.navy }}>
+              <MailCheck size={26} color="#fff" />
+            </div>
+            <div className="text-xl font-bold mb-2" style={{ color: C.text }}>Kiểm tra email của bạn</div>
+            <div className="text-sm mb-6" style={{ color: C.sub }}>
+              Nếu <span className="font-semibold" style={{ color: C.text }}>{email}</span> đã đăng ký, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu (kiểm tra cả mục Spam).
+            </div>
+            <button
+              onClick={() => {
+                setForgotSent(false);
+                setMode("login");
+              }}
+              className="w-full rounded-full py-3 text-sm font-semibold text-white"
+              style={{ backgroundColor: C.navy }}
+            >
+              Quay lại đăng nhập
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="w-full flex items-center justify-center px-6" style={{ height: "100dvh", backgroundColor: C.bg }}>
+        <form onSubmit={handleForgotSubmit} className="w-full" style={{ maxWidth: 360 }}>
+          <div className="text-xl font-bold mb-1 text-center" style={{ color: C.text }}>Quên mật khẩu?</div>
+          <div className="text-sm mb-6 text-center" style={{ color: C.sub }}>Nhập email, chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu</div>
+          <div className="relative mb-4">
+            <Mail size={16} style={{ position: "absolute", left: 12, top: 13, color: C.sub }} />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              style={inputStyle(C)}
+              autoFocus
+            />
+          </div>
+          {error && <div className="text-xs mb-3" style={{ color: C.red }}>{error}</div>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-full py-3 flex items-center justify-center gap-2 text-sm font-semibold text-white"
+            style={{ backgroundColor: C.navy, opacity: loading ? 0.7 : 1 }}
+          >
+            {loading && <Loader2 size={16} className="animate-spin" />}
+            Gửi hướng dẫn
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setError("");
+              setMode("login");
+            }}
+            className="w-full mt-3 text-xs font-semibold text-center"
+            style={{ color: C.sub }}
+          >
+            Quay lại đăng nhập
+          </button>
+        </form>
       </div>
     );
   }
@@ -377,6 +574,28 @@ export default function AuthScreen({ C, onAuthed }) {
               style={inputStyle(C)}
             />
           </div>
+
+          {mode === "register" && (
+            <div className="text-xs mb-1" style={{ color: passwordHint(password) && password ? C.red : C.sub }}>
+              Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt
+            </div>
+          )}
+
+          {mode === "login" && (
+            <div className="flex justify-end mb-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setMode("forgot");
+                }}
+                className="text-xs font-semibold"
+                style={{ color: C.sub }}
+              >
+                Quên mật khẩu?
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="text-xs mt-2 mb-1" style={{ color: C.red }}>

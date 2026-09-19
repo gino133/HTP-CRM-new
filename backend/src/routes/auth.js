@@ -5,12 +5,18 @@ import { OAuth2Client } from "google-auth-library";
 import User from "../models/User.js";
 import { signToken } from "../utils/jwt.js";
 import { requireAuth } from "../middleware/auth.js";
-import { sendVerificationEmail } from "../utils/mailer.js";
+import { sendVerificationEmail, sendResetPasswordEmail } from "../utils/mailer.js";
 
 const router = Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 giờ
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 giờ
+
+function buildResetUrl(token) {
+  const base = process.env.FRONTEND_URL || "";
+  return `${base}${base.includes("?") ? "&" : "?"}resetToken=${token}`;
+}
 
 function buildVerifyUrl(token) {
   const base = process.env.BACKEND_URL || "";
@@ -33,6 +39,16 @@ function isValidUsername(username) {
   return /^[a-zA-Z0-9_]{3,20}$/.test(username || "");
 }
 
+// Tối thiểu 8 ký tự, có ít nhất 1 chữ hoa, 1 chữ thường, 1 số, 1 ký tự đặc biệt
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+function passwordErrorMessage(password) {
+  if (String(password || "").length < 8) return "Mật khẩu cần tối thiểu 8 ký tự";
+  if (!PASSWORD_REGEX.test(password)) {
+    return "Mật khẩu cần có chữ hoa, chữ thường, số và ký tự đặc biệt";
+  }
+  return null;
+}
+
 // POST /auth/register
 router.post("/register", async (req, res) => {
   try {
@@ -46,8 +62,9 @@ router.post("/register", async (req, res) => {
     if (!isValidUsername(username)) {
       return res.status(400).json({ message: "Username chỉ gồm chữ, số, dấu gạch dưới, từ 3-20 ký tự" });
     }
-    if (String(password).length < 6) {
-      return res.status(400).json({ message: "Mật khẩu cần tối thiểu 6 ký tự" });
+    const passwordError = passwordErrorMessage(password);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
     }
     const usernameLower = username.toLowerCase();
     const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username: usernameLower }] });
@@ -241,6 +258,80 @@ router.patch("/username", requireAuth, async (req, res) => {
     return res.json({ user: req.user.toPublicJSON() });
   } catch (err) {
     console.error("[auth/username]", err);
+    return res.status(500).json({ message: "Có lỗi xảy ra, vui lòng thử lại" });
+  }
+});
+
+// POST /auth/forgot-password  { email }
+router.post("/forgot-password", async (req, res) => {
+  const genericMsg = { message: "Nếu email tồn tại, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu." };
+  try {
+    const { email } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ message: "Vui lòng nhập email" });
+    }
+    const user = await User.findOne({ email: String(email).toLowerCase() }).select("+password");
+    if (!user) {
+      return res.json(genericMsg); // Không tiết lộ email có tồn tại hay không
+    }
+    if (!user.password) {
+      // Tài khoản chỉ đăng ký qua Google, không có mật khẩu để reset -> vẫn báo chung chung
+      // ra ngoài, nhưng gửi email hướng dẫn dùng Google để họ không bị kẹt
+      try {
+        await sendResetPasswordEmail({
+          to: user.email,
+          name: user.name,
+          resetUrl: process.env.FRONTEND_URL || "",
+        });
+      } catch (e) {
+        console.error("[auth/forgot-password] gửi email (tài khoản Google) thất bại:", e.message);
+      }
+      return res.json(genericMsg);
+    }
+    const token = crypto.randomBytes(32).toString("hex");
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    await user.save();
+    try {
+      await sendResetPasswordEmail({ to: user.email, name: user.name, resetUrl: buildResetUrl(token) });
+    } catch (mailErr) {
+      console.error("[auth/forgot-password] gửi email thất bại:", mailErr.message);
+      // Vẫn trả thông báo chung chung, không lộ lỗi hệ thống ra ngoài
+    }
+    return res.json(genericMsg);
+  } catch (err) {
+    console.error("[auth/forgot-password]", err);
+    return res.status(500).json({ message: "Có lỗi xảy ra, vui lòng thử lại" });
+  }
+});
+
+// POST /auth/reset-password  { token, password }
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { token, password } = req.body || {};
+    if (!token || !password) {
+      return res.status(400).json({ message: "Thiếu thông tin" });
+    }
+    const passwordError = passwordErrorMessage(password);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
+    }
+    const user = await User.findOne({ resetPasswordToken: token }).select(
+      "+resetPasswordToken +resetPasswordExpires"
+    );
+    if (!user) {
+      return res.status(400).json({ message: "Link đặt lại mật khẩu không hợp lệ hoặc đã được dùng" });
+    }
+    if (user.resetPasswordExpires && user.resetPasswordExpires.getTime() < Date.now()) {
+      return res.status(400).json({ message: "Link đặt lại mật khẩu đã hết hạn, vui lòng yêu cầu lại" });
+    }
+    user.password = await bcrypt.hash(password, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+    return res.json({ message: "Đặt lại mật khẩu thành công, bạn có thể đăng nhập ngay" });
+  } catch (err) {
+    console.error("[auth/reset-password]", err);
     return res.status(500).json({ message: "Có lỗi xảy ra, vui lòng thử lại" });
   }
 });

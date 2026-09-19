@@ -73,6 +73,20 @@ export async function resendVerification(email) {
   });
 }
 
+export async function forgotPassword(email) {
+  return request("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword({ token, password }) {
+  return request("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+}
+
 export async function loginWithGoogle(idToken) {
   const data = await request("/auth/google", {
     method: "POST",

@@ -33,6 +33,10 @@ const userSchema = new mongoose.Schema(
     verificationToken: { type: String, select: false },
     verificationTokenExpires: { type: Date, select: false },
 
+    // Quên mật khẩu
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false },
+
     // Thông tin bổ sung, chỉnh sửa trong phần Cài đặt tài khoản
     phone: { type: String, trim: true },
     address: { type: String, trim: true },

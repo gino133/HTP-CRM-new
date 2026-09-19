@@ -11,10 +11,15 @@ Chỉ xử lý tài khoản người dùng — chưa đụng tới dữ liệu C
 | GET | `/auth/verify-email?token=...` | — | Link trong email xác nhận trỏ tới đây; xác nhận xong sẽ chuyển hướng (redirect) về `FRONTEND_URL` kèm `?verify=success\|expired\|error` |
 | POST | `/auth/resend-verification` | `{ email }` | Gửi lại email xác nhận (dùng khi email cũ hết hạn hoặc không nhận được) |
 | POST | `/auth/login` | `{ email, password }` | Đăng nhập bằng email/mật khẩu. Trả lỗi 403 kèm `emailNotVerified: true` nếu tài khoản chưa xác nhận email |
+| POST | `/auth/forgot-password` | `{ email }` | Gửi email chứa link đặt lại mật khẩu (hiệu lực 1 giờ). Luôn trả thông báo chung chung dù email có tồn tại hay không |
+| POST | `/auth/reset-password` | `{ token, password }` | Đặt mật khẩu mới bằng token lấy từ link trong email |
 | POST | `/auth/google` | `{ idToken }` | Đăng nhập/đăng ký bằng Google (nếu chưa có username, frontend sẽ hỏi thêm). Tài khoản Google coi như đã xác thực email sẵn |
 | GET | `/auth/me` | header `Authorization: Bearer <token>` | Lấy thông tin user hiện tại |
 | PATCH | `/auth/username` | `{ username }` | Đặt/đổi username (dùng cho user đăng ký qua Google) |
 | PATCH | `/auth/profile` | `{ name?, phone?, address? }` | Cập nhật họ tên / số điện thoại / địa chỉ |
+
+**Quy tắc mật khẩu** (áp dụng cho `/auth/register` và `/auth/reset-password`): tối thiểu 8 ký tự, bắt buộc có ít nhất 1 chữ hoa, 1 chữ thường, 1 số, 1 ký tự đặc biệt.
+
 | GET | `/businesses` | — | Danh sách công việc tôi sở hữu hoặc đã tham gia |
 | POST | `/businesses` | `{ name, customers?, products?, quotes?, tasks? }` | Tạo công việc mới (có thể kèm dữ liệu di trú) |
 | PATCH | `/businesses/:id` | `{ name }` | Đổi tên (chỉ chủ sở hữu) |
